@@ -190,6 +190,13 @@ function(protobuf_generate_grpc_cpp)
     get_filename_component(REL_DIR ${REL_FIL} DIRECTORY)
     set(RELFIL_WE "${REL_DIR}/${FIL_WE}")
 
+    #if cross-compiling, find host plugin
+    if(CMAKE_CROSSCOMPILING)
+      find_program(_gRPC_CPP_PLUGIN grpc_cpp_plugin)
+    else()
+      set(_gRPC_CPP_PLUGIN $<TARGET_FILE:grpc_cpp_plugin>)
+    endif()
+
     add_custom_command(
       OUTPUT "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.grpc.pb.cc"
              "${_gRPC_PROTO_GENS_DIR}/${RELFIL_WE}.grpc.pb.h"
@@ -199,10 +206,10 @@ function(protobuf_generate_grpc_cpp)
       COMMAND ${_gRPC_PROTOBUF_PROTOC_EXECUTABLE}
       ARGS --grpc_out=generate_mock_code=true:${_gRPC_PROTO_GENS_DIR}
            --cpp_out=${_gRPC_PROTO_GENS_DIR}
-           --plugin=protoc-gen-grpc=$<TARGET_FILE:grpc_cpp_plugin>
+           --plugin=protoc-gen-grpc=${_gRPC_CPP_PLUGIN}
            ${_protobuf_include_path}
            ${REL_FIL}
-      DEPENDS ${ABS_FIL} ${_gRPC_PROTOBUF_PROTOC} grpc_cpp_plugin
+      DEPENDS ${ABS_FIL} ${_gRPC_PROTOBUF_PROTOC} ${_gRPC_CPP_PLUGIN}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       COMMENT "Running gRPC C++ protocol buffer compiler on ${FIL}"
       VERBATIM)
@@ -3805,16 +3812,15 @@ foreach(_hdr
     DESTINATION "${gRPC_INSTALL_INCLUDEDIR}/${_path}"
   )
 endforeach()
+if (gRPC_INSTALL)
+install(TARGETS grpc++_error_details EXPORT gRPCTargets
+  RUNTIME DESTINATION ${gRPC_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${gRPC_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${gRPC_INSTALL_LIBDIR}
+)
+endif()
 endif (gRPC_BUILD_CODEGEN)
 
-
-if (gRPC_INSTALL)
-  install(TARGETS grpc++_error_details EXPORT gRPCTargets
-    RUNTIME DESTINATION ${gRPC_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${gRPC_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${gRPC_INSTALL_LIBDIR}
-  )
-endif()
 
 if (gRPC_BUILD_TESTS)
 
@@ -3935,16 +3941,15 @@ foreach(_hdr
     DESTINATION "${gRPC_INSTALL_INCLUDEDIR}/${_path}"
   )
 endforeach()
-endif (gRPC_BUILD_CODEGEN)
-
 
 if (gRPC_INSTALL)
-  install(TARGETS grpc++_reflection EXPORT gRPCTargets
-    RUNTIME DESTINATION ${gRPC_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${gRPC_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${gRPC_INSTALL_LIBDIR}
-  )
+install(TARGETS grpc++_reflection EXPORT gRPCTargets
+  RUNTIME DESTINATION ${gRPC_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${gRPC_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${gRPC_INSTALL_LIBDIR}
+)
 endif()
+endif (gRPC_BUILD_CODEGEN)
 
 if (gRPC_BUILD_TESTS)
 
@@ -4916,16 +4921,14 @@ foreach(_hdr
     DESTINATION "${gRPC_INSTALL_INCLUDEDIR}/${_path}"
   )
 endforeach()
-endif (gRPC_BUILD_CODEGEN)
-
-
 if (gRPC_INSTALL)
-  install(TARGETS grpcpp_channelz EXPORT gRPCTargets
-    RUNTIME DESTINATION ${gRPC_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${gRPC_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${gRPC_INSTALL_LIBDIR}
-  )
+install(TARGETS grpcpp_channelz EXPORT gRPCTargets
+  RUNTIME DESTINATION ${gRPC_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${gRPC_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${gRPC_INSTALL_LIBDIR}
+)
 endif()
+endif (gRPC_BUILD_CODEGEN)
 
 if (gRPC_BUILD_TESTS)
 

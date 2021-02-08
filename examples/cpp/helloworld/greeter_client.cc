@@ -16,11 +16,13 @@
  *
  */
 
+#include <grpcpp/grpcpp.h>
+
+#include <functional>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <string>
-
-#include <grpcpp/grpcpp.h>
 
 #ifdef BAZEL_BUILD
 #include "examples/protos/helloworld.grpc.pb.h"
@@ -31,9 +33,32 @@
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
-using helloworld::HelloRequest;
-using helloworld::HelloReply;
 using helloworld::Greeter;
+using helloworld::HelloReply;
+using helloworld::HelloRequest;
+using helloworld::HelloVoid;
+
+using notify_cb = std::function<void(const std::string&)>;
+
+struct Notifier {
+  std::future<void> job_;
+  std::unique_ptr<grpc::ClientContext> context_;
+  Notifier(notify_cb cb, Greeter::Stub* stub) {
+    job_ = std::async(std::launch::async, [cb, stub, this] {
+      context_ = std::make_unique<grpc::ClientContext>();
+      HelloVoid request;
+      auto reader = stub->NotifyHello(context_.get(), request);
+      HelloReply reply;
+      while (reader->Read(&reply)) {
+        cb(reply.message());
+      }
+    });
+  }
+  ~Notifier() {
+    context_->TryCancel();
+    job_.wait();
+  }
+};
 
 class GreeterClient {
  public:
@@ -67,6 +92,11 @@ class GreeterClient {
     }
   }
 
+  std::unique_ptr<Notifier> NotifyHello(
+      std::function<void(const std::string&)> cb) {
+    return std::make_unique<Notifier>(cb, stub_.get());
+  }
+
  private:
   std::unique_ptr<Greeter::Stub> stub_;
 };
@@ -87,7 +117,8 @@ int main(int argc, char** argv) {
       if (arg_val[start_pos] == '=') {
         target_str = arg_val.substr(start_pos + 1);
       } else {
-        std::cout << "The only correct argument syntax is --target=" << std::endl;
+        std::cout << "The only correct argument syntax is --target="
+                  << std::endl;
         return 0;
       }
     } else {
@@ -97,8 +128,15 @@ int main(int argc, char** argv) {
   } else {
     target_str = "localhost:50051";
   }
-  GreeterClient greeter(grpc::CreateChannel(
-      target_str, grpc::InsecureChannelCredentials()));
+  GreeterClient greeter(
+      grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
+
+  auto cb = [](const std::string& s) {
+    std::cout << "Message: " << s << std::endl;
+  };
+
+  auto token = greeter.NotifyHello(cb);
+
   std::string user("world");
   std::string reply = greeter.SayHello(user);
   std::cout << "Greeter received: " << reply << std::endl;

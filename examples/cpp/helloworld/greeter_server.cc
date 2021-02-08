@@ -16,13 +16,15 @@
  *
  */
 
+#include <grpcpp/ext/proto_server_reflection_plugin.h>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
+
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <string>
-
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/health_check_service_interface.h>
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
+#include <thread>
 
 #ifdef BAZEL_BUILD
 #include "examples/protos/helloworld.grpc.pb.h"
@@ -33,10 +35,14 @@
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
+using grpc::ServerWriter;
 using grpc::Status;
-using helloworld::HelloRequest;
-using helloworld::HelloReply;
 using helloworld::Greeter;
+using helloworld::HelloReply;
+using helloworld::HelloRequest;
+using helloworld::HelloVoid;
+using std::chrono::milliseconds;
+using std::this_thread::sleep_for;
 
 // Logic and data behind the server's behavior.
 class GreeterServiceImpl final : public Greeter::Service {
@@ -45,6 +51,14 @@ class GreeterServiceImpl final : public Greeter::Service {
     std::string prefix("Hello ");
     reply->set_message(prefix + request->name());
     return Status::OK;
+  }
+
+  Status NotifyHello(ServerContext* context, const HelloVoid* /*request*/,
+                     ServerWriter<HelloReply>* /*writer*/) override {
+    while (!context->IsCancelled()) {
+      sleep_for(milliseconds(50));
+    }
+    return context->IsCancelled() ? Status::CANCELLED : Status::OK;
   }
 };
 
